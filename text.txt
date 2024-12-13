@@ -1,0 +1,11 @@
+
+D:\test.mp4
+
+D:\test\test_converted.mp4
+
+D:\logo.png
+
+
+
+
+ const command = ffmpeg(inputFile).size(size).aspect(aspect).videoBitrate(bitrate).videoFilter((aspect === '9:16') ? 'crop=ih*9/16:ih:(in_w-out_w)/2:(in_h-out_h)/2': '').videoFilter(`-i ${logo} -filter_complex "[1:v] scale=w=iw*0.25:h=ih*0.25 [scaled_logo] [0:v][scaled_logo] overlay='W-w/2:H-h/2'"`)
