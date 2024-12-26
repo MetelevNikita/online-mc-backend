@@ -3,6 +3,10 @@ const path = require('path')
 
 // util
 
+const { createLogMessage } = require('./../util/logFile')
+
+//
+
 
 let inputFile = ''
 let outputFile = ''
@@ -67,6 +71,8 @@ const postFile = (req, res) => {
     inputFile = req.file.originalname
     outputFile = path.resolve(__dirname, `../../public/output/${req.file.originalname.slice(0, -4)}_coverted.mp4`)
 
+    createLogMessage(`Загружен файл ${req.file.filename} - размер файла ${Math.floor(req.file.size / 1024 ** 2)}.mb`)
+
     res.status(200).json(req.file)
 
   } catch (error) {
@@ -78,25 +84,14 @@ const postFile = (req, res) => {
 
 
 
-const openFile = (req, res) => {
-  try {
-
-    const pathFile = path.join(__dirname, `../../public/output/${inputFile.slice(0, -4)}_converted.mp4`)
-    res.status(200).sendjson(pathFile)
-
-
-  } catch (error) {
-    res.status(500).send({message: `Ошибка полуения файлов ${error.message}`})
-  }
-}
-
-
 
 const downloadFile = (req, res) => {
 
   try {
 
     const file = path.resolve(__dirname, `../../public/output/${inputFile.slice(0, -4)}_converted.mp4`)
+    console.log(file)
+
     res.download(file)
 
   } catch (error) {
@@ -110,4 +105,4 @@ const downloadFile = (req, res) => {
 //
 
 
-module.exports = { getFiles, getSingleFile, postFile, openFile, downloadFile }
+module.exports = { getFiles, getSingleFile, postFile, downloadFile }

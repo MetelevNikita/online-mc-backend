@@ -12,13 +12,13 @@ const fs = require('fs');
 
 
 const fileRouter = require('./Router/fileRouter');
+const { createLogMessage } = require('./util/logFile');
 
 //
 
 const app = express();
 
 const videoPath = path.join(__dirname, '../public/video');
-console.log(videoPath)
 
 
 app.use(cors());
@@ -50,7 +50,7 @@ wss.on('connection', (ws) => {
           const { bitrate, aspect, size, logo, fileName  } = JSON.parse(message);
 
           const pathFile = path.parse(fileName);
-          const outputPath = `D:/NODE JS/onlineConverter/backend/public/output/${pathFile.name}_converted${pathFile.ext}`
+          const outputPath = `D:/NODE JS/onlineConverter/backend/public/output/${pathFile.name}_converted.mp4`
           const sizeVideo= size.split('x');
 
           //
@@ -66,16 +66,11 @@ wss.on('connection', (ws) => {
 
           (!logo) ?
 
-          ffmpeg().input(fileName).videoBitrate(bitrate).videoCodec('libx264').audioCodec('aac').complexFilter([
+          ffmpeg().input(fileName).videoBitrate(bitrate).videoCodec('libx265').audioCodec('aac').complexFilter([
 
-            {
-              filter: 'crop',
-              options: (aspect !=='9:16') ? {w: sizeVideo[0], h: sizeVideo[1]} : {w: verticalWidth, h: sizeVideo[1]},
-              inputs: ['0:v'],
-              outputs: ['res']
-            }
+          `scale=${sizeVideo[0]}:${sizeVideo[1]}, ${(aspect === '9:16') ? `crop=in_w/3:in_h` : `crop=in_w:in_h`}`
 
-          ], 'res').format('mp4').on('start', (commandLine) => {
+          ]).format('mp4').on('start', (commandLine) => {
             console.log('Конвертация началась:', commandLine);
             ws.send(JSON.stringify({ event: 'start', message: commandLine }));
 
@@ -86,10 +81,14 @@ wss.on('connection', (ws) => {
           })
           .on('error', (err) => {
             console.error('Ошибка:', err.message);
+            createLogMessage('Ошибка:', err.message)
             ws.send(JSON.stringify({ event: 'error', message: err.message }));
           })
           .on('end', () => {
             console.log('Конвертация завершена');
+            const outputFileStat = fs.statSync(path.join(__dirname, `../public/output/${pathFile.name}_converted.mp4`))
+            console.log(outputFileStat.size)
+            createLogMessage(`Файл сконвертирован ${pathFile.name}_converted${pathFile.ext} - рамзер файла ${Math.floor(outputFileStat.size / 1024 ** 2)} mb`)
             ws.send(JSON.stringify({ event: 'end', message: 'Конвертация завершена' }));
 
           })
@@ -97,27 +96,9 @@ wss.on('connection', (ws) => {
 
           :
 
-          ffmpeg().input(fileName).input(logo).videoBitrate(bitrate).videoCodec('libx264').audioCodec('aac').complexFilter([
+          ffmpeg().input(fileName).input(logo).videoBitrate(bitrate).videoCodec('libx265').audioCodec('aac').complexFilter([
 
-            {
-              filter: 'crop',
-              options: (aspect !=='9:16') ? {w: sizeVideo[0], h: sizeVideo[1]} : {w: verticalWidth, h: sizeVideo[1]},
-              inputs: ['0:v'],
-              outputs: ['crop']
-            },
-
-            { filter: 'scale',
-              options: {w: 100, h: 100},
-              inputs: ['1:v'],
-              outputs: ['scale']
-            },
-
-            {
-              filter: 'overlay',
-              options: {x: 50, y: 50},
-              inputs: ['crop', 'scale'],
-              outputs: ['res']
-            }
+            `[0:v] scale=${sizeVideo[0]}:${sizeVideo[1]}[scaled], ${(aspect === '9:16') ? `[scaled]crop=in_w/3:in_h[croped]` : `[scaled]crop=in_w:in_h[croped]`}, [1:v]scale=100:100[logo], [croped][logo]overlay=x=(W-100):y=0[res]`
 
           ], 'res').format('mp4').on('start', (commandLine) => {
             console.log('Конвертация началась:', commandLine);
@@ -130,24 +111,38 @@ wss.on('connection', (ws) => {
           })
           .on('error', (err) => {
             console.error('Ошибка:', err.message);
+            createLogMessage('Ошибка:', err.message)
             ws.send(JSON.stringify({ event: 'error', message: err.message }));
           })
           .on('end', () => {
             console.log('Конвертация завершена');
+            const outputFileStat = fs.statSync(path.join(__dirname, `../public/output/${pathFile.name}_converted.mp4`))
+            console.log(outputFileStat)
+            createLogMessage(`Файл сконвертирован ${pathFile.name}_converted${pathFile.ext} - рамзер файла ${Math.floor(outputFileStat.size / 1024 ** 2)} mb`)
             ws.send(JSON.stringify({ event: 'end', message: 'Конвертация завершена' }));
+          })
+          .save(outputPath, () => {
 
           })
-          .save(outputPath)
+
+
+
 
 
         } catch (error) {
           console.log(`ОШИБКА!!!! ${error}`);
           ws.send({event: 'error', message: error.message })
+          createLogMessage(`Ошибка ${error.message}`)
           ws.close(1000, 'соединение остановлено')
         }
 
   })
 })
+
+
+
+
+
 
 
 

@@ -21,9 +21,7 @@ const upload = multer({ storage: diskStorage(videoPath) });
 
 fileRouter.get('/file', getFiles)
 
-
 fileRouter.get('/file/:id', getSingleFile)
-
 
 fileRouter.post('/file', upload.single('file'), postFile)
 
