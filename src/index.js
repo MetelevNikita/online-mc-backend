@@ -7,18 +7,23 @@ const WebSocket = require('ws');
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
+const schedule = require('node-schedule');
 
 // modules
 
 
 const fileRouter = require('./Router/fileRouter');
+const imageRouter = require('./Router/imageRouter');
 const { createLogMessage } = require('./util/logFile');
+const { deleteFile } = require('./util/deleteFolderFiles');
 
 //
 
 const app = express();
 
 const videoPath = path.join(__dirname, '../public/video');
+const outputPath = path.join(__dirname, '../public/output');
+const imagePath = path.join(__dirname, '../public/image');
 
 
 app.use(cors());
@@ -30,6 +35,7 @@ app.use('/file', express.static(path.join(__dirname, '../public/output')))
 // router
 
 app.use('/api/v1', fileRouter)
+app.use('/api/v1', imageRouter)
 
 //
 
@@ -49,7 +55,17 @@ wss.on('connection', (ws) => {
 
           const { bitrate, aspect, size, logo, fileName  } = JSON.parse(message);
 
+
+
+
           const pathFile = path.parse(fileName);
+          const pathImage = path.parse(logo)
+
+          console.log(pathImage)
+
+
+
+
           const outputPath = `D:/NODE JS/onlineConverter/backend/public/output/${pathFile.name}_converted.mp4`
           const sizeVideo= size.split('x');
 
@@ -87,8 +103,10 @@ wss.on('connection', (ws) => {
           .on('end', () => {
             console.log('Конвертация завершена');
             const outputFileStat = fs.statSync(path.join(__dirname, `../public/output/${pathFile.name}_converted.mp4`))
-            console.log(outputFileStat.size)
-            createLogMessage(`Файл сконвертирован ${pathFile.name}_converted${pathFile.ext} - рамзер файла ${Math.floor(outputFileStat.size / 1024 ** 2)} mb`)
+            const imageStat = fs.statSync(path.join(__dirname, `../public/image/${pathImage.name}.png`))
+
+            console.log(imageStat)
+            createLogMessage(`Файл сконвертирован ${pathFile.name}_converted${pathFile.ext} - рамзер файла ${outputFileStat.size} kb`)
             ws.send(JSON.stringify({ event: 'end', message: 'Конвертация завершена' }));
 
           })
@@ -117,17 +135,13 @@ wss.on('connection', (ws) => {
           .on('end', () => {
             console.log('Конвертация завершена');
             const outputFileStat = fs.statSync(path.join(__dirname, `../public/output/${pathFile.name}_converted.mp4`))
-            console.log(outputFileStat)
-            createLogMessage(`Файл сконвертирован ${pathFile.name}_converted${pathFile.ext} - рамзер файла ${Math.floor(outputFileStat.size / 1024 ** 2)} mb`)
+            const imageStat = fs.statSync(path.join(__dirname, `../public/image/${pathImage.base}`))
+
+            console.log(imageStat)
+            createLogMessage(`Файл сконвертирован ${pathFile.name}_converted${pathFile.ext} - рамзер файла ${outputFileStat.size} kb`)
             ws.send(JSON.stringify({ event: 'end', message: 'Конвертация завершена' }));
           })
-          .save(outputPath, () => {
-
-          })
-
-
-
-
+          .save(outputPath)
 
         } catch (error) {
           console.log(`ОШИБКА!!!! ${error}`);
@@ -139,6 +153,20 @@ wss.on('connection', (ws) => {
   })
 })
 
+
+
+// delete files
+
+
+
+
+
+const job = schedule.scheduleJob('20 11 * * *', (fireDate) => {
+  console.log('fireDate', fireDate)
+  deleteFile(videoPath)
+  deleteFile(outputPath)
+  deleteFile(imagePath)
+})
 
 
 

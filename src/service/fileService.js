@@ -67,7 +67,7 @@ const getSingleFile = (req, res) => {
 const postFile = (req, res) => {
 
   try {
-    console.log(req.file)
+
     inputFile = req.file.originalname
     outputFile = path.resolve(__dirname, `../../public/output/${req.file.originalname.slice(0, -4)}_coverted.mp4`)
 
