@@ -26,9 +26,13 @@ const outputPath = path.join(__dirname, '../public/output');
 const imagePath = path.join(__dirname, '../public/image');
 
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://utv-stream.ru',  // Разрешить запросы с этого домена
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({ extended: true }));  
 app.use(express.static(videoPath));
 app.use('/file', express.static(path.join(__dirname, '../public/output')))
 
@@ -54,19 +58,16 @@ wss.on('connection', (ws) => {
         try {
 
           const { bitrate, aspect, size, logo, fileName  } = JSON.parse(message);
+          let totalTime
 
 
-
+          console.log(logo)
 
           const pathFile = path.parse(fileName);
           const pathImage = path.parse(logo)
 
-          console.log(pathImage)
 
-
-
-
-          const outputPath = `D:/NODE JS/onlineConverter/backend/public/output/${pathFile.name}_converted.mp4`
+          const outputPath = path.join(__dirname, `../public/output/${pathFile.name}_converted.mp4`)
           const sizeVideo= size.split('x');
 
           //
@@ -82,7 +83,7 @@ wss.on('connection', (ws) => {
 
           (!logo) ?
 
-          ffmpeg().input(fileName).videoBitrate(bitrate).videoCodec('libx265').audioCodec('aac').complexFilter([
+          ffmpeg().input(fileName).videoBitrate(bitrate).outputOptions(['-progress pipe:','-vcodec libx264','-acodec aac']).complexFilter([
 
           `scale=${sizeVideo[0]}:${sizeVideo[1]}, ${(aspect === '9:16') ? `crop=in_w/3:in_h` : `crop=in_w:in_h`}`
 
@@ -91,9 +92,15 @@ wss.on('connection', (ws) => {
             ws.send(JSON.stringify({ event: 'start', message: commandLine }));
 
           })
+          .on('codecData', (data) => {
+            totalTime = parseInt(data.duration.replace(/:/g, ''))
+
+          })
           .on('progress', (progress) => {
-            console.log(`progress: ${progress.percent}%`);
-            ws.send(JSON.stringify({ event: 'progress', message: progress.percent }))
+            const time = parseInt(progress.timemark.replace(/:/g, ''))
+            const percent = (time / totalTime) * 100
+            console.log(`progress: ${percent}%`);
+            ws.send(JSON.stringify({ event: 'progress', message: percent }))
           })
           .on('error', (err) => {
             console.error('Ошибка:', err.message);
@@ -103,9 +110,6 @@ wss.on('connection', (ws) => {
           .on('end', () => {
             console.log('Конвертация завершена');
             const outputFileStat = fs.statSync(path.join(__dirname, `../public/output/${pathFile.name}_converted.mp4`))
-            const imageStat = fs.statSync(path.join(__dirname, `../public/image/${pathImage.name}.png`))
-
-            console.log(imageStat)
             createLogMessage(`Файл сконвертирован ${pathFile.name}_converted${pathFile.ext} - рамзер файла ${outputFileStat.size} kb`)
             ws.send(JSON.stringify({ event: 'end', message: 'Конвертация завершена' }));
 
@@ -114,7 +118,7 @@ wss.on('connection', (ws) => {
 
           :
 
-          ffmpeg().input(fileName).input(logo).videoBitrate(bitrate).videoCodec('libx265').audioCodec('aac').complexFilter([
+          ffmpeg().input(fileName).input(logo).videoBitrate(bitrate).outputOptions(['-progress pipe:','-vcodec libx264','-acodec aac']).complexFilter([
 
             `[0:v] scale=${sizeVideo[0]}:${sizeVideo[1]}[scaled], ${(aspect === '9:16') ? `[scaled]crop=in_w/3:in_h[croped]` : `[scaled]crop=in_w:in_h[croped]`}, [1:v]scale=100:100[logo], [croped][logo]overlay=x=(W-100):y=0[res]`
 
@@ -123,9 +127,14 @@ wss.on('connection', (ws) => {
             ws.send(JSON.stringify({ event: 'start', message: commandLine }));
 
           })
+          .on('codecData', (data) => {
+            totalTime = parseInt(data.duration.replace(/:/g, ''))
+          })
           .on('progress', (progress) => {
-            console.log(`progress: ${progress.percent}%`);
-            ws.send(JSON.stringify({ event: 'progress', message: progress.percent }))
+            const time = parseInt(progress.timemark.replace(/:/g, ''))
+            const percent = (time / totalTime) * 100
+            console.log(`progress: ${percent}%`);
+            ws.send(JSON.stringify({ event: 'progress', message: percent }))
           })
           .on('error', (err) => {
             console.error('Ошибка:', err.message);
@@ -135,9 +144,6 @@ wss.on('connection', (ws) => {
           .on('end', () => {
             console.log('Конвертация завершена');
             const outputFileStat = fs.statSync(path.join(__dirname, `../public/output/${pathFile.name}_converted.mp4`))
-            const imageStat = fs.statSync(path.join(__dirname, `../public/image/${pathImage.base}`))
-
-            console.log(imageStat)
             createLogMessage(`Файл сконвертирован ${pathFile.name}_converted${pathFile.ext} - рамзер файла ${outputFileStat.size} kb`)
             ws.send(JSON.stringify({ event: 'end', message: 'Конвертация завершена' }));
           })
@@ -158,21 +164,12 @@ wss.on('connection', (ws) => {
 // delete files
 
 
-
-
-
-const job = schedule.scheduleJob('20 11 * * *', (fireDate) => {
+const job = schedule.scheduleJob('00 05 * * *', (fireDate) => {
   console.log('fireDate', fireDate)
   deleteFile(videoPath)
   deleteFile(outputPath)
   deleteFile(imagePath)
 })
-
-
-
-
-
-
 
 
 
